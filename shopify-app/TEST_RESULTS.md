@@ -38,3 +38,7 @@ Comandi ripetibili: `npm ci`, `npm run setup` con DB di test, `npm run check`, `
 | Migrazione `202609280001_report_closure` (tabella e trigger di immutabilità) e `npm run test:db` esteso alle chiusure | NON ESEGUITI: nessun PostgreSQL disponibile in questa sessione; SQL della tabella generato da Prisma, trigger scritto a mano |
 
 Non rieseguiti in questo aggiornamento: test HTTP, audit dipendenze, prove su development store e invio reale al gestore.
+
+## Aggiornamento 28 settembre 2026, uso sullo store
+
+L'app è stata provata dall'autore sullo store Shopify ed è usata ogni giorno per la chiusura della giornata. I dettagli delle prove sullo store non sono riportati in questo file.

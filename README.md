@@ -1,5 +1,7 @@
 # Rapportino giornaliero
 
+**Italiano** | [English](README.en.md)
+
 Il rapportino vendite di fine giornata per negozi che vendono con Shopify POS: prima scritto a mano in Excel, ora generato dagli ordini Shopify, chiuso come definitivo e inviato da solo al gestore.
 
 ![Rapportino definitivo, chiuso e inviato al gestore](docs/screenshots/rapportino-giornaliero-06-definitivo-desktop.png)
@@ -12,7 +14,7 @@ In quattro negozi, a fine giornata, il personale scriveva a mano in un foglio Ex
 
 1. **Vendite su Shopify POS.** Ho configurato un tablet con Shopify POS: ogni vendita viene registrata con prodotti, prezzi, sconti e metodo di pagamento.
 2. **Primo script, luglio 2026.** Uno script Python genera il rapportino in Excel direttamente dagli ordini del giorno.
-3. **App Shopify e script aggiornato, settembre 2026.** Un'app dentro l'Admin di Shopify mostra il rapportino, lo esporta in PDF ed Excel, registra le uscite di cassa e calcola i contanti attesi. La stampa definitiva chiude la giornata e manda PDF ed Excel al gestore. Lo script Python ha ricevuto lo stesso design e le stesse regole.
+3. **App Shopify e script aggiornato, settembre 2026.** Un'app dentro l'Admin di Shopify mostra il rapportino, lo esporta in PDF ed Excel, registra le uscite di cassa e calcola i contanti attesi. La stampa definitiva chiude la giornata e manda PDF ed Excel al gestore. Lo script Python ha ricevuto lo stesso design e le stesse regole. Oggi l'app è in uso ogni giorno sullo store.
 
 Il documento resta quello che il personale conosceva: una vendita dopo l'altra, i totali di cassa in fondo. Dove servivano 20 minuti ora bastano un clic e, per la chiusura definitiva, una conferma.
 
@@ -67,8 +69,8 @@ Le credenziali vanno solo nei file `.env`, che git ignora.
 
 ## Stato
 
-- Il rapportino automatico è in uso in quattro negozi.
-- L'app è completa e testata in locale con 32 test automatici, ma non è ancora stata provata sullo store reale: prima del rilascio servono la migrazione del database, le prove su un development store e un invio email e una stampa reali. Dettagli in [`SECURITY.md`](shopify-app/SECURITY.md) e [`TEST_RESULTS.md`](shopify-app/TEST_RESULTS.md).
+- **In produzione:** l'app è stata provata sullo store Shopify ed è usata ogni giorno per chiudere la giornata. Il rapportino automatico è in uso in quattro negozi.
+- **Test:** 32 test automatici su calcoli, chiusura definitiva, API ed export. Le verifiche fatte e le segnalazioni aperte sulle librerie di terze parti sono in [`TEST_RESULTS.md`](shopify-app/TEST_RESULTS.md) e [`SECURITY.md`](shopify-app/SECURITY.md).
 - Limiti noti: solo EUR, contanti attesi senza fondo cassa iniziale, prezzo di confronto preso dal catalogo attuale e non storico.
 
 ## Dati

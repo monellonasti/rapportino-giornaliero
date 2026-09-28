@@ -2,7 +2,7 @@
 
 Versione 0.2.0. App embedded Remix/TypeScript, Shopify App Bridge, PostgreSQL/Prisma. Lo script Python che produce lo stesso rapportino è nella cartella [`../python-script`](../python-script).
 
-**Stato: base funzionante per collaudo in development store, non approvata per produzione.** Autenticazione/configurazione sono implementate; restano test reali Shopify e vulnerabilità upstream Remix descritte in `SECURITY.md`. `npm run deploy` esegue controlli e si ferma se l'audit runtime non passa.
+**Stato: in uso ogni giorno sullo store (aggiornamento del 28 settembre 2026).** Restano aperte le segnalazioni upstream di Remix descritte in `SECURITY.md`. `npm run deploy` esegue controlli e si ferma se l'audit runtime non passa.
 
 ## Cosa contiene
 

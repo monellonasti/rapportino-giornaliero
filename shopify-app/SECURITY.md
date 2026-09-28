@@ -1,6 +1,6 @@
-# Blocco di rilascio — 27 settembre 2026
+# Sicurezza e dipendenze, 27 settembre 2026
 
-L'app è predisposta per il collaudo, **non dichiarata sicura/pronta alla produzione**.
+Aggiornamento del 28 settembre 2026: l'app è stata provata sullo store ed è in uso ogni giorno. Le segnalazioni sulle dipendenze descritte qui sotto restano aperte finché non si migra il framework.
 
 Dopo aggiornamenti e override testati, `npm audit --omit=dev` rileva 9 pacchetti segnalati (7 high, 2 moderate), dovuti a dipendenze condivise; non sono 9 vulnerabilità indipendenti. Audit completo: 10 pacchetti (8 high, 2 moderate), nessuno critical.
 
