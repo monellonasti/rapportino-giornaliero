@@ -1,0 +1,30 @@
+# Credenziali: mai nel repository
+.env
+.env.*
+!.env.example
+
+# Dati reali generati dagli script (rapportini con vendite vere)
+python-script/output/
+shopify-app/preview/
+*.xlsx
+*.pdf
+
+# Dipendenze, build, cache
+node_modules/
+build/
+coverage/
+.cache/
+.shopify/
+pgdata/
+__pycache__/
+*.pyc
+.venv/
+
+# Varie
+audit*.json
+*.log
+*.zip
+*.tmp
+.DS_Store
+Thumbs.db
+desktop.ini

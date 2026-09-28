@@ -1,0 +1,16 @@
+# Solo sviluppo: in produzione usare PostgreSQL gestito con backup e TLS.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rapportino
+      POSTGRES_PASSWORD: local_only_password
+      POSTGRES_DB: rapportino
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["rapportino_db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rapportino"]
+      interval: 5s
+      retries: 10
+volumes:
+  rapportino_db:

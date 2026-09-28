@@ -1,0 +1,5 @@
+requests==2.32.3
+openpyxl==3.1.5
+python-dotenv==1.0.1
+# Fusi orari per zoneinfo su Windows.
+tzdata>=2025.2

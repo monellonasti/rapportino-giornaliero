@@ -1,0 +1,11 @@
+node_modules/
+build/
+.env
+.env.*
+!.env.example
+.shopify/
+coverage/
+*.log
+*.zip
+pgdata/
+preview/

@@ -1,0 +1,72 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+model CashExpense {
+  id          String   @id @default(cuid())
+  shop        String
+  reportDate  String
+  amountCents Int
+  reason      String
+  note        String
+  operatorId  String
+  requestId   String
+  createdAt   DateTime @default(now())
+
+  @@unique([shop, requestId])
+  @@index([shop, reportDate])
+}
+
+model EmailDelivery {
+  id        String   @id @default(cuid())
+  shop      String
+  requestId String
+  status    String   @default("sending")
+  createdAt DateTime @default(now())
+
+  @@unique([shop, requestId])
+}
+
+// Rapportino definitivo: copia salvata alla stampa definitiva. Un trigger del
+// database impedisce modifiche e cancellazioni; cambia solo l'esito dell'email.
+model ReportClosure {
+  id          String   @id @default(cuid())
+  shop        String
+  reportDate  String
+  report      Json
+  operatorId  String
+  requestId   String
+  emailStatus String   @default("pending")
+  createdAt   DateTime @default(now())
+
+  @@unique([shop, reportDate])
+  @@unique([shop, requestId])
+}

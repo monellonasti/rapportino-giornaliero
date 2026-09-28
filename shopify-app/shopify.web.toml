@@ -1,0 +1,7 @@
+name = "Rapportino web"
+roles = ["frontend", "backend"]
+webhooks_path = "/webhooks/app/uninstalled"
+
+[commands]
+predev = "npm run setup"
+dev = "npm run dev:web"

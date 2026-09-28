@@ -1,0 +1,27 @@
+# Sostituire client_id e dominio dopo config:link. Mai inserire il client secret qui.
+client_id = "replace_with_dev_dashboard_client_id"
+name = "Rapportino Giornaliero"
+application_url = "https://replace-me.example.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[access_scopes]
+scopes = "read_orders,read_products,read_locations"
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = ["https://replace-me.example.com/auth/callback"]
+
+[webhooks]
+api_version = "2026-07"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
+
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
