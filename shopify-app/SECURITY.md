@@ -2,6 +2,8 @@
 
 Aggiornamento del 28 settembre 2026: l'app è stata provata sullo store ed è in uso ogni giorno. Le segnalazioni sulle dipendenze descritte qui sotto restano aperte finché non si migra il framework.
 
+Audit del 29 settembre 2026: `npm audit --omit=dev` riporta gli stessi 9 pacchetti; `npm audit fix` non propone correzioni compatibili (solo versioni precedenti di Remix, incompatibili). La soluzione resta la migrazione a React Router 7.
+
 Dopo aggiornamenti e override testati, `npm audit --omit=dev` rileva 9 pacchetti segnalati (7 high, 2 moderate), dovuti a dipendenze condivise; non sono 9 vulnerabilità indipendenti. Audit completo: 10 pacchetti (8 high, 2 moderate), nessuno critical.
 
 - `turbo-stream` 2.x, dipendenza Remix: [GHSA-rxv8-25v2-qmq8](https://github.com/advisories/GHSA-rxv8-25v2-qmq8). Il progetto disabilita `v3_singleFetch`; ciò non equivale a una certificazione di non sfruttabilità né rimuove la segnalazione.

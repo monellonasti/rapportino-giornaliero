@@ -175,7 +175,9 @@ def build_sale(order, zone):
         item = edge['node']
         qty = int(item.get('quantity') or 0)
         # Prezzo venduto al netto degli sconti di riga; il prezzo di listino è il "prezzo di confronto".
-        sold = get_amount(item.get('discountedUnitPriceSet')) or get_amount(item.get('originalUnitPriceSet'))
+        # Un omaggio ha prezzo scontato 0,00: non va sostituito con il prezzo pieno.
+        discounted = item.get('discountedUnitPriceSet')
+        sold = get_amount(discounted if discounted else item.get('originalUnitPriceSet'))
         variant = item.get('variant') or {}
         compare = money(variant.get('compareAtPrice')) if variant.get('compareAtPrice') else Decimal('0')
         if compare <= 0:

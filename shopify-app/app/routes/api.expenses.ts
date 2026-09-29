@@ -14,6 +14,6 @@ export async function action({ request }: ActionFunctionArgs) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    return apiError(error);
+    return apiError(error, "api/expenses");
   }
 }

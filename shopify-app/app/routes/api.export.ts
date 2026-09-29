@@ -29,6 +29,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       },
     });
   } catch (error) {
-    return apiError(error);
+    return apiError(error, "api/export");
   }
 }

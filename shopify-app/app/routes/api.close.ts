@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { z } from "zod";
-import { apiAdmin, apiError } from "../api.server";
+import { apiAdmin, apiError, logError } from "../api.server";
 import { config } from "../shopify.server";
 import { closeReport } from "../report.server";
 import { setEmailStatus, type EmailStatus } from "../closures.server";
@@ -47,7 +47,7 @@ export async function action({ request }: ActionFunctionArgs) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    return apiError(error);
+    return apiError(error, "api/close");
   }
 }
 
@@ -56,8 +56,9 @@ async function notifyManager(shop: string, report: Report) {
   let status: EmailStatus = "sent";
   try {
     await sendReport(report, attachments, config.smtp!.manager);
-  } catch {
+  } catch (error) {
     // Il server SMTP potrebbe averla accettata comunque: va verificata la casella.
+    logError("api/close email", error);
     status = "uncertain";
   }
   await setEmailStatus(shop, report.date, status);

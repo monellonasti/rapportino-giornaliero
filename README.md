@@ -49,7 +49,7 @@ Tutte le immagini sono in [`docs/screenshots`](docs/screenshots).
 
 | Cartella | Contenuto |
 | --- | --- |
-| [`shopify-app/`](shopify-app) | App Shopify incorporata nell'Admin: Remix 2.17, React 18, TypeScript, Admin GraphQL API 2026-07, PostgreSQL con Prisma 6, ExcelJS e PDFKit per gli export, nodemailer per l'email, Vitest (32 test). |
+| [`shopify-app/`](shopify-app) | App Shopify incorporata nell'Admin: Remix 2.17, React 18, TypeScript, Admin GraphQL API 2026-07, PostgreSQL con Prisma 6, ExcelJS e PDFKit per gli export, nodemailer per l'email, Vitest (43 test). |
 | [`python-script/`](python-script) | Script Python 3 con openpyxl: stesso rapportino in Excel, invio SMTP al gestore e stampa sulla stampante predefinita. |
 | [`docs/screenshots/`](docs/screenshots) | Immagini del progetto con dati inventati. |
 
@@ -70,7 +70,7 @@ Le credenziali vanno solo nei file `.env`, che git ignora.
 ## Stato
 
 - **In produzione:** l'app è stata provata sullo store Shopify ed è usata ogni giorno per chiudere la giornata. Il rapportino automatico è in uso in quattro negozi.
-- **Test:** 32 test automatici su calcoli, chiusura definitiva, API ed export. Le verifiche fatte e le segnalazioni aperte sulle librerie di terze parti sono in [`TEST_RESULTS.md`](shopify-app/TEST_RESULTS.md) e [`SECURITY.md`](shopify-app/SECURITY.md).
+- **Test:** 43 test automatici per l'app (calcoli, chiusura definitiva, API, limite di velocità Shopify, export) e 10 per lo script Python. Le verifiche fatte e le segnalazioni aperte sulle librerie di terze parti sono in [`TEST_RESULTS.md`](shopify-app/TEST_RESULTS.md) e [`SECURITY.md`](shopify-app/SECURITY.md).
 - Limiti noti: solo EUR, contanti attesi senza fondo cassa iniziale, prezzo di confronto preso dal catalogo attuale e non storico.
 
 ## Dati
