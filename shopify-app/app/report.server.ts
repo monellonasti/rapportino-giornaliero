@@ -1,4 +1,6 @@
 import type { Prisma } from "@prisma/client";
+import { GraphqlQueryError } from "@shopify/shopify-api";
+import { UserError } from "./errors";
 import { DateTime } from "luxon";
 import db from "./db.server";
 import {
@@ -24,18 +26,56 @@ const orderFields = `id name createdAt sourceName cancelledAt test paymentGatewa
  totalPriceSet {${moneyFields}} subtotalPriceSet {${moneyFields}} totalTaxSet {${moneyFields}} totalShippingPriceSet {${moneyFields}} totalDiscountsSet {${moneyFields}}
  lineItems(first: 20) {nodes {${lineFields}} pageInfo {hasNextPage endCursor}}`;
 const movementFields = `id name createdAt test transactions(first: 100) {id kind status gateway processedAt amountSet {${moneyFields}}}`;
+
+// Quando i punti di costo GraphQL finiscono, Shopify risponde THROTTLED (HTTP 200): il client
+// ufficiale ritenta solo 429/503 e lancia GraphqlQueryError. Qui si attende il tempo che serve
+// a ricaricare i punti mancanti e si riprova, con un numero limitato di tentativi.
+const THROTTLE_RETRIES = 4;
+interface ThrottledBody {
+  errors?: { graphQLErrors?: { extensions?: { code?: string } }[] };
+  extensions?: {
+    cost?: {
+      requestedQueryCost?: number;
+      throttleStatus?: { currentlyAvailable?: number; restoreRate?: number };
+    };
+  };
+}
+export function throttleWait(error: unknown): number | null {
+  if (!(error instanceof GraphqlQueryError)) return null;
+  const body = error.body as ThrottledBody | undefined;
+  const throttled = body?.errors?.graphQLErrors?.some(
+    (e) => e.extensions?.code === "THROTTLED",
+  );
+  if (!throttled) return null;
+  const cost = body?.extensions?.cost;
+  const missing =
+    (cost?.requestedQueryCost ?? 0) -
+    (cost?.throttleStatus?.currentlyAvailable ?? 0);
+  const rate = cost?.throttleStatus?.restoreRate || 50;
+  return Math.min(10_000, Math.max(1_000, Math.ceil((missing / rate) * 1000)));
+}
+const pause = (ms: number) => new Promise((done) => setTimeout(done, ms));
 async function query<T>(
   admin: Admin,
   document: string,
   variables = {},
 ): Promise<T> {
-  const result = await admin.graphql(document, { variables });
-  const body = (await result.json()) as { data?: T; errors?: unknown[] };
-  if (body.errors?.length || !body.data)
-    throw new Error(
-      "Shopify non ha restituito dati completi. Verificare scope e disponibilità API.",
-    );
-  return body.data as T;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      // `tries`: il client ritenta da solo 429 e 503.
+      const result = await admin.graphql(document, { variables, tries: 3 });
+      const body = (await result.json()) as { data?: T; errors?: unknown[] };
+      if (body.errors?.length || !body.data)
+        throw new Error(
+          "Shopify non ha restituito dati completi. Verificare scope e disponibilità API.",
+        );
+      return body.data as T;
+    } catch (error) {
+      const wait = throttleWait(error);
+      if (wait === null || attempt >= THROTTLE_RETRIES) throw error;
+      await pause(wait);
+    }
+  }
 }
 export async function shopInfo(admin: Admin) {
   return (
@@ -71,14 +111,17 @@ async function orders(
       throw new Error("Paginazione ordini interrotta");
     cursor = data.orders.pageInfo.endCursor;
   }
-  throw new Error(
-    "Troppi ordini per il report sincrono (200 pagine); serve un job asincrono",
+  throw new UserError(
+    "Troppi ordini da leggere per questa data (oltre 200 pagine): il rapportino non può essere generato in modo completo.",
   );
 }
 async function completeLines(admin: Admin, order: Order) {
   let info = order.lineItems.pageInfo;
   for (let page = 0; info.hasNextPage; page++) {
-    if (page >= 100) throw new Error("Troppi articoli nello stesso ordine");
+    if (page >= 100)
+      throw new UserError(
+        `Ordine ${order.name}: troppi articoli per generare il rapportino in modo completo.`,
+      );
     const data: {
       order: { lineItems: { nodes: Line[]; pageInfo: typeof info } };
     } = await query(
