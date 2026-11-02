@@ -40,6 +40,9 @@ model CashExpense {
   operatorId  String
   requestId   String
   createdAt   DateTime @default(now())
+  // Annullamento prima della chiusura: l'uscita resta registrata con chi e quando.
+  cancelledAt DateTime?
+  cancelledBy String?
 
   @@unique([shop, requestId])
   @@index([shop, reportDate])

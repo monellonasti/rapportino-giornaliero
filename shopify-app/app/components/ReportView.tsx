@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  dateTimeOf,
   displayMetric,
   euro,
   generatedLabel,
@@ -7,6 +8,7 @@ import {
   plural,
   statusLabel,
   timeOf,
+  type Expense,
   type Report,
   type ReportOrder,
 } from "../report";
@@ -118,15 +120,19 @@ function OrderCard({ order: o }: { order: ReportOrder }) {
 export function ReportView({
   report,
   expenseForm,
+  expenseAction,
   loading = false,
 }: {
   report: Report;
   expenseForm?: ReactNode;
+  // Comandi per riga (es. annullamento), solo nella pagina e solo in bozza.
+  expenseAction?: (expense: Expense) => ReactNode;
   loading?: boolean;
 }) {
   const sales = report.summary.filter((m) => m.group === "vendite");
   const items = report.orders.reduce((n, o) => n + o.items, 0);
   const final = report.status === "definitivo";
+  const cancelled = report.expenses.filter((e) => e.cancelledAt).length;
   return (
     <article
       className={loading ? "report is-loading" : "report"}
@@ -302,8 +308,10 @@ export function ReportView({
           <h2 id="uscite">Uscite di cassa</h2>
           {report.expenses.length > 0 && (
             <p>
-              {plural(report.expenses.length, "uscita", "uscite")} ·{" "}
+              {plural(report.expenses.length - cancelled, "uscita", "uscite")} ·{" "}
               {euro(report.expensesTotal)}
+              {cancelled > 0 &&
+                ` · ${plural(cancelled, "annullata", "annullate")}`}
             </p>
           )}
         </header>
@@ -327,18 +335,40 @@ export function ReportView({
                   <th scope="col" className="num">
                     Importo
                   </th>
+                  {expenseAction && (
+                    <th scope="col" className="no-print">
+                      <span className="sr-only">Azioni</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {report.expenses.map((e) => (
-                  <tr key={e.id}>
+                  <tr
+                    key={e.id}
+                    className={e.cancelledAt ? "cancelled" : undefined}
+                  >
                     <td className="num-left">
                       {timeOf(e.createdAt, report.timezone)}
                     </td>
-                    <td className="strong">{e.reason}</td>
+                    <td className="strong">
+                      {e.reason}
+                      {e.cancelledAt && (
+                        <span className="cancel-note">
+                          Annullata il{" "}
+                          {dateTimeOf(e.cancelledAt, report.timezone)} ·
+                          operatore {e.cancelledBy}
+                        </span>
+                      )}
+                    </td>
                     <td>{e.note}</td>
                     <td className="muted">{e.operatorId}</td>
-                    <td className="num strong">{euro(e.amountCents)}</td>
+                    <td className="num strong amount">{euro(e.amountCents)}</td>
+                    {expenseAction && (
+                      <td className="row-action no-print">
+                        {!e.cancelledAt && expenseAction(e)}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -348,6 +378,7 @@ export function ReportView({
                     Totale uscite
                   </th>
                   <td className="num">{euro(report.expensesTotal)}</td>
+                  {expenseAction && <td className="no-print" />}
                 </tr>
               </tfoot>
             </table>

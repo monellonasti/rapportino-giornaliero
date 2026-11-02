@@ -17,7 +17,7 @@ const { PrismaSessionStorage } = await import(
 );
 await import("@shopify/shopify-app-remix/adapters/node");
 const { Session } = await import("@shopify/shopify-api");
-const { addExpense } = await import("../app/expenses.server");
+const { addExpense, cancelExpense } = await import("../app/expenses.server");
 const { default: appDb } = await import("../app/db.server");
 const id = randomUUID();
 const shop = `test-${id}.myshopify.com`;
@@ -61,6 +61,16 @@ try {
   assert.equal(await db.cashExpense.count({ where: { shop: other } }), 0);
   form.set("amount", "-1");
   await assert.rejects(() => addExpense(shop, "123", form));
+  // Annullamento prima della chiusura: resta registrata con chi e quando; mai da un altro negozio.
+  const expense = (await db.cashExpense.findFirst({ where: { shop } }))!;
+  await assert.rejects(
+    () => cancelExpense(other, "456", { id: expense.id }),
+    /non trovata/,
+  );
+  await cancelExpense(shop, "456", { id: expense.id });
+  const cancelled = await db.cashExpense.findFirst({ where: { shop } });
+  assert.equal(cancelled?.cancelledBy, "456");
+  assert.ok(cancelled?.cancelledAt);
   // Rapportino definitivo: il database ne impedisce modifica e cancellazione e blocca nuove uscite.
   const { asDefinitive, makeReport } = await import("../app/report");
   const { findClosure, saveClosure, setEmailStatus } = await import(
@@ -90,13 +100,17 @@ try {
   form.set("amount", "10,00");
   form.set("requestId", randomUUID());
   await assert.rejects(() => addExpense(shop, "123", form), /definitivo/);
+  await assert.rejects(
+    () => cancelExpense(shop, "123", { id: expense.id }),
+    /definitivo/,
+  );
   await new PrismaSessionStorage(db).deleteSession(session.id);
   assert.equal(
     await new PrismaSessionStorage(db).loadSession(session.id),
     undefined,
   );
   console.log(
-    "PASS: PostgreSQL session persistence/reconnect/refresh, expense idempotency, tenant isolation, validation and immutable closures",
+    "PASS: PostgreSQL session persistence/reconnect/refresh, expense idempotency and cancellation, tenant isolation, validation and immutable closures",
   );
 } finally {
   // Solo sul database di test: il trigger va sospeso per rimuovere la chiusura sintetica.

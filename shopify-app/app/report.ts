@@ -69,6 +69,9 @@ export interface Expense {
   note: string;
   operatorId: string;
   createdAt: string;
+  // Uscita annullata prima della chiusura: resta in elenco ma non nei totali.
+  cancelledAt?: string | null;
+  cancelledBy?: string | null;
 }
 export type MetricFormat = "money" | "number" | "percent";
 export interface Metric {
@@ -369,7 +372,10 @@ export function makeReport(input: {
     0,
   );
   const discounts = sales.reduce((n, o) => n + amount(o.totalDiscountsSet), 0);
-  const expenses = input.expenses.reduce((n, e) => n + e.amountCents, 0);
+  const expenses = input.expenses.reduce(
+    (n, e) => (e.cancelledAt ? n : n + e.amountCents),
+    0,
+  );
   const metric =
     (group: Metric["group"], format: MetricFormat) =>
     (label: string, value: number, strong = false): Metric => ({
