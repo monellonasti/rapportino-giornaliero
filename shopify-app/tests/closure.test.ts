@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => {
   const client = {
     $executeRaw: vi.fn(),
-    cashExpense: { findMany: vi.fn(), upsert: vi.fn() },
+    cashExpense: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() },
     reportClosure: { findUnique: vi.fn(), create: vi.fn() },
   };
   return {
@@ -54,6 +54,7 @@ const stored = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   db.cashExpense.findMany.mockResolvedValue([]);
+  db.cashExpense.findUnique.mockResolvedValue(null);
   db.reportClosure.findUnique.mockResolvedValue(null);
 });
 
@@ -123,4 +124,58 @@ it("rifiuta nuove uscite su un giorno già chiuso", async () => {
   await expect(addExpense(shop, "7", form)).rejects.toBeInstanceOf(UserError);
   expect(db.$executeRaw).toHaveBeenCalledOnce();
   expect(db.cashExpense.upsert).not.toHaveBeenCalled();
+});
+
+const expenseForm = (values: Record<string, string> = {}) => {
+  const form = new FormData();
+  Object.entries({
+    date: day,
+    amount: "5,00",
+    reason: "Corriere",
+    note: "",
+    requestId: randomUUID(),
+    ...values,
+  }).forEach(([key, value]) => form.set(key, value));
+  return form;
+};
+const savedExpense = (form: FormData) => ({
+  id: "e1",
+  shop,
+  reportDate: day,
+  amountCents: 500,
+  reason: "Corriere",
+  note: "",
+  operatorId: "7",
+  requestId: String(form.get("requestId")),
+  createdAt: new Date(),
+});
+
+it("una richiesta ripetuta con gli stessi dati non registra l'uscita due volte", async () => {
+  const form = expenseForm();
+  db.cashExpense.findUnique.mockResolvedValue(savedExpense(form));
+  await expect(addExpense(shop, "7", form)).resolves.toMatchObject({
+    amountCents: 500,
+  });
+  expect(db.cashExpense.upsert).not.toHaveBeenCalled();
+});
+
+it("una richiesta ripetuta con un importo diverso viene rifiutata, non registrata col vecchio importo", async () => {
+  const form = expenseForm({ amount: "6,00" });
+  db.cashExpense.findUnique.mockResolvedValue(savedExpense(form));
+  const error = await addExpense(shop, "7", form).catch((e: unknown) => e);
+  expect(error).toBeInstanceOf(UserError);
+  expect((error as UserError).status).toBe(409);
+  expect(db.cashExpense.upsert).not.toHaveBeenCalled();
+});
+
+it("spiega all'operatore perché un'uscita non è valida", async () => {
+  for (const amount of ["abc", "12,345", "2000000"]) {
+    const error = await addExpense(shop, "7", expenseForm({ amount })).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(UserError);
+    expect((error as UserError).status).toBe(422);
+    expect((error as UserError).message).toMatch(/[Ii]mporto/);
+  }
+  expect(db.$transaction).not.toHaveBeenCalled();
 });

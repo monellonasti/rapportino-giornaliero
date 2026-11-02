@@ -6,6 +6,49 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+# Tentativi per errori temporanei: rete, limite di velocità (429 o THROTTLED) e server Shopify (5xx).
+MAX_ATTEMPTS = 4
+RETRY_STATUS = {429, 502, 503, 504}
+
+# Campi di ogni riga ordine, usati sia nella lista ordini sia per le righe oltre le prime 100.
+LINE_FIELDS = """
+                      name
+                      quantity
+                      originalUnitPriceSet { shopMoney { amount currencyCode } }
+                      discountedUnitPriceSet { shopMoney { amount currencyCode } }
+                      variant {
+                        id
+                        compareAtPrice
+                        price
+                        sku
+                        product { title }
+                      }
+"""
+
+ORDER_LINES_QUERY = """
+query OrderLines($id: ID!, $cursor: String) {
+  order(id: $id) {
+    lineItems(first: 100, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      edges { node { __LINE_FIELDS__ } }
+    }
+  }
+}
+""".replace("__LINE_FIELDS__", LINE_FIELDS)
+
+
+def _throttled(errors):
+    return any((e.get("extensions") or {}).get("code") == "THROTTLED" for e in errors if isinstance(e, dict))
+
+
+def _throttle_wait(payload):
+    """Secondi necessari a Shopify per ricaricare i punti mancanti, tra 1 e 10."""
+    cost = (payload.get("extensions") or {}).get("cost") or {}
+    status = cost.get("throttleStatus") or {}
+    missing = (cost.get("requestedQueryCost") or 0) - (status.get("currentlyAvailable") or 0)
+    rate = status.get("restoreRate") or 50
+    return min(10.0, max(1.0, missing / rate))
+
 
 class ShopifyClient:
     """
@@ -83,21 +126,38 @@ class ShopifyClient:
         return token
 
     def graphql(self, query, variables=None):
-        token = self._get_access_token()
-        response = requests.post(
-            self.graphql_endpoint,
-            json={"query": query, "variables": variables or {}},
-            headers={
-                "X-Shopify-Access-Token": token,
-                "Content-Type": "application/json",
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if payload.get("errors"):
-            raise RuntimeError(payload["errors"])
-        return payload["data"]
+        """Esegue la query ritentando gli errori temporanei: rete, 429/5xx e limite di velocità (THROTTLED)."""
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            last = attempt == MAX_ATTEMPTS
+            token = self._get_access_token()
+            try:
+                response = requests.post(
+                    self.graphql_endpoint,
+                    json={"query": query, "variables": variables or {}},
+                    headers={
+                        "X-Shopify-Access-Token": token,
+                        "Content-Type": "application/json",
+                    },
+                    timeout=30,
+                )
+            except (requests.ConnectionError, requests.Timeout):
+                if last:
+                    raise
+                time.sleep(2 * attempt)
+                continue
+            if response.status_code in RETRY_STATUS and not last:
+                retry_after = response.headers.get("Retry-After")
+                time.sleep(float(retry_after) if retry_after else 2 * attempt)
+                continue
+            response.raise_for_status()
+            payload = response.json()
+            errors = payload.get("errors")
+            if errors and not last and _throttled(errors):
+                time.sleep(_throttle_wait(payload))
+                continue
+            if errors:
+                raise RuntimeError(errors)
+            return payload["data"]
 
     def get_shop_info(self):
         """Recupera nome negozio, fuso orario e dominio principale da Shopify."""
@@ -165,27 +225,16 @@ class ShopifyClient:
                 totalTaxSet { shopMoney { amount currencyCode } }
                 totalShippingPriceSet { shopMoney { amount currencyCode } }
                 lineItems(first: 100) {
+                  pageInfo { hasNextPage endCursor }
                   edges {
-                    node {
-                      name
-                      quantity
-                      originalUnitPriceSet { shopMoney { amount currencyCode } }
-                      discountedUnitPriceSet { shopMoney { amount currencyCode } }
-                      variant {
-                        id
-                        compareAtPrice
-                        price
-                        sku
-                        product { title }
-                      }
-                    }
+                    node { __LINE_FIELDS__ }
                   }
                 }
               }
             }
           }
         }
-        """
+        """.replace("__LINE_FIELDS__", LINE_FIELDS)
 
         orders = []
         cursor = None
@@ -196,4 +245,18 @@ class ShopifyClient:
             if not connection["pageInfo"]["hasNextPage"]:
                 break
             cursor = connection["pageInfo"]["endCursor"]
+        for order in orders:
+            self._complete_lines(order)
         return orders
+
+    def _complete_lines(self, order):
+        """Aggiunge le righe oltre le prime 100: un ordine troncato darebbe un dettaglio incompleto."""
+        lines = order.get("lineItems") or {}
+        info = lines.get("pageInfo") or {}
+        while info.get("hasNextPage"):
+            data = self.graphql(ORDER_LINES_QUERY, {"id": order["id"], "cursor": info["endCursor"]})
+            page = data["order"]["lineItems"]
+            if page["pageInfo"].get("hasNextPage") and page["pageInfo"].get("endCursor") == info["endCursor"]:
+                raise RuntimeError(f"Paginazione righe interrotta per l'ordine {order.get('name')}")
+            lines["edges"].extend(page["edges"])
+            info = page["pageInfo"]

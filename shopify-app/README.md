@@ -100,7 +100,7 @@ L'utente non può impostare un destinatario arbitrario dall'interfaccia. Il puls
 npm run check
 ```
 
-Controlla TOML, TypeScript, test unitari e build. I test verificano fuso/orario legale, pagamenti misti, rimborsi di ordini precedenti, duplicati, omaggi, limiti, validazione ambiente, protezioni API/webhook ed esportazione Excel/PDF.
+Genera il client Prisma, poi controlla TOML, TypeScript, test unitari e build: funziona anche su una copia appena scaricata, senza database. I test verificano fuso/orario legale, pagamenti misti, rimborsi di ordini precedenti, duplicati, omaggi, limiti, limite di velocità Shopify (THROTTLED), uscite ripetute con dati uguali o diversi, invio email manuale, validazione ambiente, protezioni API/webhook ed esportazione Excel/PDF.
 
 Per vedere il rapportino senza Shopify né database:
 
@@ -152,7 +152,8 @@ Per rollback conserva l'immagine precedente e un backup PostgreSQL verificato. L
 - Login continuo: verificare Client ID coerente, URL tunnel/host, callback, allowlist, session table e App Bridge. Aprire dall'Admin; non copiare solo un URL iframe privo dei parametri Shopify.
 - `403`: negozio fuori `ALLOWED_SHOPS`, token/permessi operatore non validi o origine API diversa da `SHOPIFY_APP_URL`.
 - Errore DB: verificare servizio, URL, TLS e `npm run setup`. Sul PC ARM64 la query usa l'adattatore JS; non ripristinare il vecchio engine nativo.
-- Report indisponibile: permessi insufficienti, valuta diversa da EUR, data errata, soglie superate, errore GraphQL/throttling. Nessun report parziale viene presentato come completo.
+- Report indisponibile: permessi insufficienti, valuta diversa da EUR, data errata, soglie superate, errore GraphQL. Se Shopify limita le richieste (THROTTLED) l'app attende il tempo indicato da Shopify e riprova fino a 4 volte; gli errori 429/503 sono ritentati dal client ufficiale. Nessun report parziale viene presentato come completo.
+- Log: gli errori imprevisti sono scritti sul log del server (`console.error`) con il contesto, ad esempio `[api/close email]` o `[app/rapportino]`; al browser arriva solo un messaggio generico. Data non valida, valuta e limiti superati sono mostrati all'operatore con il motivo.
 - Dati mancanti oltre 60 giorni: vedere `read_all_orders`, non cambiare la data per aggirare i permessi.
 
 ## Riferimenti ufficiali

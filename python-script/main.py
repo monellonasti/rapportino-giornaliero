@@ -140,7 +140,8 @@ def main():
     args = parser.parse_args()
     try:
         run(args, ShopifyClient())
-    except (Refused, ValueError, OSError) as error:
+    # Errori Shopify, rete, configurazione o file: messaggio leggibile all'operatore invece dello stack trace.
+    except (Refused, ValueError, OSError, RuntimeError) as error:
         print(f'Errore: {error}', file=sys.stderr)
         sys.exit(1)
 

@@ -42,3 +42,22 @@ Non rieseguiti in questo aggiornamento: test HTTP, audit dipendenze, prove su de
 ## Aggiornamento 28 settembre 2026, uso sullo store
 
 L'app è stata provata dall'autore sullo store Shopify ed è usata ogni giorno per la chiusura della giornata. I dettagli delle prove sullo store non sono riportati in questo file.
+
+## Audit del 29 settembre 2026
+
+Copia appena scaricata dalla repository, Windows, Node 24.15, Python 3.14. Nessun accesso allo store, nessuna email o stampa reale.
+
+| Verifica | Risultato |
+|---|---|
+| `npm ci` + `npm run check` su copia nuova, prima delle correzioni | FALLIVA: typecheck senza client Prisma generato (5 errori). Ora `check` esegue `db:generate` |
+| `npm run check`: Prisma, TOML, TypeScript, 43 test (9 file), build | PASS |
+| Prettier su `app/` e `tests/` | PASS |
+| Limite di velocità Shopify (THROTTLED): attesa calcolata, nuovo tentativo, rinuncia dopo 4 tentativi | PASS (test unitari; senza la correzione 3 test su 4 falliscono) |
+| Uscite ripetute: stessi dati senza doppioni, dati diversi rifiutati (409), importi non validi con messaggio (422) | PASS (test unitari) |
+| Invio email manuale: esito registrato, SMTP non confermato (502, esito incerto), richiesta ripetuta (409) | PASS (test unitari) |
+| Pagina reale `app._index.tsx` in Chrome headless con Remix, App Bridge e rete simulati: secondo invio email, focus ed Esc nella conferma, importo non valido, ripetizione uscite, chiusura e stampa unica, nessuna stampa inattesa | PASS 11/11 (sulla versione precedente 4 controlli falliscono) |
+| Handler HTTP della build di produzione in memoria senza database: salute 503, redirect, login con `lang="it"`, API 401, origine estranea 403, webhook con firma falsa rifiutato | PASS |
+| Script Python: 10 test (calcolo, client Shopify, stampa definitiva) | PASS (5 falliscono senza le correzioni) |
+| Query dello script (ordini con `pageInfo` sulle righe e righe oltre le prime 100) | Valide sullo schema Admin API 2026-07 (validatore Shopify) |
+| `npm audit --omit=dev` | Invariato: 9 pacchetti (7 high, 2 moderate); nessuna correzione compatibile, solo migrazione a React Router 7 |
+| Migrazioni, trigger, `test:db` e `test:http` su PostgreSQL | NON ESEGUITI: nessun PostgreSQL o Docker attivo su questa macchina |

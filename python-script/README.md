@@ -87,7 +87,18 @@ Il nome negozio viene preso automaticamente da Shopify (`shop.name`). Se vuoi fo
 - Rilanciare `--stampa definitiva` sulla stessa data ristampa lo stesso file senza rigenerarlo e senza reinviare l'email. Se il file risulta modificato o rimosso, la ristampa viene rifiutata.
 - Dopo la chiusura, bozze e nuove generazioni di quella data sono rifiutate.
 - Se l'email non parte, il definitivo resta salvato: controlla la casella del gestore e rilancia lo stesso comando per ritentare invio e stampa.
+- Errori temporanei di Shopify (rete, 429/5xx, limite di velocità) vengono ritentati fino a 4 volte prima di fermarsi con un messaggio.
 - La stampa usa la stampante predefinita con il programma associato ai file Excel (`lp` fuori da Windows).
+
+## Test
+
+Dalla cartella dello script, senza chiamate reali a Shopify, email o stampante:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Verificano omaggi e sconti sull'ordine, nuovi tentativi su errori temporanei e limite di velocità di Shopify, ordini con più di 100 righe e il flusso della stampa definitiva (registro, impronta SHA-256, email, ristampa).
 
 ## Nota importante
 Il prezzo di listino usato nel rapportino è il `compareAtPrice` / prezzo di confronto Shopify. Se manca, il software usa il prezzo venduto e imposta sconto a zero.

@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 import { DateTime } from "luxon";
+import { UserError } from "./errors";
 
 export function cents(value: string | number) {
   const n = new Decimal(value)
@@ -16,7 +17,7 @@ export function dateRange(date: string, zone: string) {
     !start.isValid ||
     start.toISODate() !== date
   )
-    throw new Error("Data non valida");
+    throw new UserError("Data non valida", 422);
   return {
     start: start.toUTC().toISO()!,
     end: start.plus({ days: 1 }).toUTC().toISO()!,
@@ -231,7 +232,7 @@ export function makeReport(input: {
 }): Report {
   const { start, end } = dateRange(input.date, input.timezone);
   if (input.currency !== "EUR")
-    throw new Error(
+    throw new UserError(
       "Questa versione del rapportino supporta solo negozi in EUR",
     );
   const amount = (m: Money) => {
@@ -329,7 +330,7 @@ export function makeReport(input: {
   for (const o of input.movements) {
     if (o.test) continue;
     if (o.transactions.length >= 100)
-      throw new Error(
+      throw new UserError(
         `Ordine ${o.name}: limite di 100 transazioni raggiunto; report bloccato per evitare totali incompleti`,
       );
     for (const t of o.transactions) {

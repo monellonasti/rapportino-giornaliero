@@ -22,7 +22,7 @@
     "shopify": "shopify",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run config:check && npm run typecheck && npm test && npm run build",
+    "check": "npm run db:generate && npm run config:check && npm run typecheck && npm test && npm run build",
     "test:db": "tsx scripts/test-db.ts",
     "preview:report": "tsx scripts/preview-report.tsx",
     "release:check": "node scripts/check-config.mjs --production && npm run env:check && npm run check && npm audit --omit=dev --audit-level=moderate",

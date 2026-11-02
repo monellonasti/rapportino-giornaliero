@@ -5,9 +5,11 @@ import {
   useRevalidator,
   useNavigation,
 } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { config, requireAdmin } from "../shopify.server";
+import { logError } from "../api.server";
+import { UserError } from "../errors";
 import { loadReport } from "../report.server";
 import { emailStatusOf } from "../closures.server";
 import { shortDate } from "../report";
@@ -35,13 +37,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
     };
   } catch (error) {
     if (error instanceof Response) throw error;
+    // Motivi noti (data, valuta, limiti) all'operatore; il resto nei log del server.
+    if (!(error instanceof UserError)) logError("app/rapportino", error);
     return {
       report: null,
       emailStatus: null,
       emailEnabled: config.emailEnabled,
       managerEmail,
       error:
-        "Rapportino non disponibile. Verifica la data, i permessi ordini/prodotti e la connessione al database. Negozi non EUR e report oltre i limiti documentati non sono supportati.",
+        error instanceof UserError
+          ? `Rapportino non disponibile: ${error.message}`
+          : "Rapportino non disponibile. Verifica la data, i permessi ordini/prodotti e la connessione al database, poi riprova.",
     };
   }
 }
@@ -62,20 +68,32 @@ export default function Rapportino() {
   const [confirming, setConfirming] = useState(false);
   const [printPending, setPrintPending] = useState(false);
   const closed = report?.status === "definitivo";
+  const finalButton = useRef<HTMLButtonElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
   useEffect(() => {
     setExpenseId(null);
     setEmailId(null);
     setCloseId(null);
     setConfirming(false);
+    setPrintPending(false);
     setNotice(null);
   }, [report?.date]);
-  // Dopo la chiusura si stampa la copia definitiva appena ricaricata.
+  // Dopo la chiusura si stampa la copia definitiva appena ricaricata; se il ricaricamento
+  // fallisce la stampa non resta in sospeso per partire più tardi senza motivo.
   useEffect(() => {
-    if (printPending && closed && revalidator.state === "idle") {
+    if (!printPending || revalidator.state !== "idle") return;
+    if (closed) {
       setPrintPending(false);
       window.print();
-    }
-  }, [printPending, closed, revalidator.state]);
+    } else if (!report) setPrintPending(false);
+  }, [printPending, closed, report, revalidator.state]);
+  // Conferma della definitiva: il focus va sull'azione meno rischiosa e poi torna al pulsante.
+  useEffect(() => {
+    if (confirming) cancelButton.current?.focus();
+    else if (wasConfirming.current) finalButton.current?.focus();
+    wasConfirming.current = confirming;
+  }, [confirming]);
   async function call(path: string, init: RequestInit = {}) {
     const response = await fetch(path, {
       ...init,
@@ -178,21 +196,21 @@ export default function Rapportino() {
         <div className="appbar-actions" role="group" aria-label="Esporta">
           <button
             className="btn"
-            disabled={!report || busy}
+            disabled={!report || busy || loading}
             onClick={() => download("xlsx")}
           >
             Scarica Excel
           </button>
           <button
             className="btn"
-            disabled={!report || busy}
+            disabled={!report || busy || loading}
             onClick={() => download("pdf")}
           >
             Scarica PDF
           </button>
           <button
             className="btn"
-            disabled={!report || busy || !emailEnabled}
+            disabled={!report || busy || loading || !emailEnabled}
             title={
               emailEnabled
                 ? "Invia al destinatario configurato"
@@ -207,6 +225,8 @@ export default function Rapportino() {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ date: report!.date, requestId: id }),
                 });
+                // Inviata: un nuovo clic è una nuova richiesta, non un doppione.
+                setEmailId(null);
                 setNotice({
                   tone: "ok",
                   text: "Email accettata dal server SMTP.",
@@ -218,7 +238,7 @@ export default function Rapportino() {
           </button>
           <button
             className="btn"
-            disabled={!report || busy || closed}
+            disabled={!report || busy || loading || closed}
             title={
               closed
                 ? "Il rapportino è definitivo: si stampa solo la copia definitiva"
@@ -231,15 +251,16 @@ export default function Rapportino() {
           {closed ? (
             <button
               className="btn btn-primary"
-              disabled={busy}
+              disabled={busy || loading}
               onClick={() => window.print()}
             >
               Ristampa definitiva
             </button>
           ) : (
             <button
+              ref={finalButton}
               className="btn btn-primary"
-              disabled={!report || busy || !emailEnabled}
+              disabled={!report || busy || loading || !emailEnabled}
               title={
                 emailEnabled
                   ? "Chiude il rapportino e lo invia al gestore"
@@ -258,6 +279,9 @@ export default function Rapportino() {
           role="alertdialog"
           aria-labelledby="confirm-title"
           aria-describedby="confirm-text"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !busy) setConfirming(false);
+          }}
         >
           <h2 id="confirm-title">
             Stampa definitiva del {shortDate(report.date)}
@@ -276,6 +300,7 @@ export default function Rapportino() {
               Conferma e stampa
             </button>
             <button
+              ref={cancelButton}
               className="btn"
               disabled={busy}
               onClick={() => setConfirming(false)}
@@ -321,6 +346,8 @@ export default function Rapportino() {
             closed ? undefined : (
               <form
                 className="expense-form no-print"
+                // Dati cambiati dopo un errore: è una nuova richiesta, non la ripetizione della precedente.
+                onInput={() => setExpenseId(null)}
                 onSubmit={(e) => {
                   e.preventDefault();
                   const form = e.currentTarget;
@@ -344,6 +371,8 @@ export default function Rapportino() {
                     name="amount"
                     inputMode="decimal"
                     placeholder="35,00"
+                    pattern="\d{1,7}([.,]\d{1,2})?"
+                    title="Importo in euro con al massimo due decimali, es. 35,50"
                     required
                   />
                 </label>
