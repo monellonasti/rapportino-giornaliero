@@ -565,11 +565,12 @@ function recap(ws: Sheet, report: Report, top: number) {
 }
 
 function expensesTable(ws: Sheet, report: Report, top: number) {
+  const cancelled = report.expenses.filter((e) => e.cancelledAt).length;
   let r = section(
     ws,
     top,
     "Uscite di cassa",
-    `${plural(report.expenses.length, "uscita", "uscite")}  ·  ${euro(report.expensesTotal)}`,
+    `${plural(report.expenses.length - cancelled, "uscita", "uscite")}  ·  ${euro(report.expensesTotal)}${cancelled ? `  ·  ${plural(cancelled, "annullata", "annullate")}` : ""}`,
   );
   const heads = {
     font: { size: 8.5, bold: true, ...muted },
@@ -598,13 +599,26 @@ function expensesTable(ws: Sheet, report: Report, top: number) {
   height(ws, r++, 20);
   const rule = { bottom: edge(P.line) };
   for (const e of report.expenses) {
+    // Uscite annullate: in grigio, con chi e quando, fuori dal totale.
+    const off = !!e.cancelledAt;
+    const cancelNote = off
+      ? `annullata il ${dateTimeOf(e.cancelledAt!, report.timezone)} da operatore ${e.cancelledBy}`
+      : "";
     const text: ExcelJS.RichText[] = [
-      { text: e.reason, font: font({ bold: true }) },
+      {
+        text: off ? `${e.reason} (annullata)` : e.reason,
+        font: font({ bold: true, ...(off ? muted : {}) }),
+      },
     ];
     if (e.note)
       text.push({
         text: `  —  ${e.note}`,
-        font: font({ color: color(P.ink2) }),
+        font: font(off ? muted : { color: color(P.ink2) }),
+      });
+    if (off)
+      text.push({
+        text: `  —  ${cancelNote}`,
+        font: font({ color: color(P.warn) }),
       });
     put(
       ws,
@@ -629,8 +643,13 @@ function expensesTable(ws: Sheet, report: Report, top: number) {
       numFmt: MONEY,
       border: rule,
       align: { vertical: "top" },
+      ...(off && { font: { strike: true, ...muted } }),
     });
-    height(ws, r++, wrapHeight(`${e.reason}  —  ${e.note}`, 46));
+    height(
+      ws,
+      r++,
+      wrapHeight(`${e.reason}  —  ${e.note}  —  ${cancelNote}`, 46),
+    );
   }
   const totals: Look = {
     font: { bold: true },
@@ -822,6 +841,8 @@ export async function excel(report: Report) {
       { header: "Note", key: "note", width: 48 },
       { header: "Operatore ID", key: "operatorId", width: 22 },
       { header: "Importo EUR", key: "amount", width: 16, numFmt: MONEY },
+      { header: "Annullata il", key: "cancelledAt", width: 18 },
+      { header: "Annullata da", key: "cancelledBy", width: 22 },
     ],
     report.expenses.map((e) => ({
       createdAt: dateTimeOf(e.createdAt, report.timezone),
@@ -829,8 +850,15 @@ export async function excel(report: Report) {
       note: e.note,
       operatorId: e.operatorId,
       amount: e.amountCents / 100,
+      cancelledAt: e.cancelledAt
+        ? dateTimeOf(e.cancelledAt, report.timezone)
+        : "",
+      cancelledBy: e.cancelledBy ?? "",
     })),
-    { createdAt: "Totale", amount: report.expensesTotal / 100 },
+    {
+      createdAt: "Totale (escluse annullate)",
+      amount: report.expensesTotal / 100,
+    },
   );
   dataSheet(
     book,

@@ -12,7 +12,7 @@ import { logError } from "../api.server";
 import { UserError } from "../errors";
 import { loadReport } from "../report.server";
 import { emailStatusOf } from "../closures.server";
-import { shortDate } from "../report";
+import { euro, shortDate, type Expense } from "../report";
 import { ReportView } from "../components/ReportView";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -67,6 +67,8 @@ export default function Rapportino() {
   const [closeId, setCloseId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [printPending, setPrintPending] = useState(false);
+  // Uscita in attesa di conferma dell'annullamento (id).
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const closed = report?.status === "definitivo";
   const finalButton = useRef<HTMLButtonElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
@@ -77,6 +79,7 @@ export default function Rapportino() {
     setCloseId(null);
     setConfirming(false);
     setPrintPending(false);
+    setCancelling(null);
     setNotice(null);
   }, [report?.date]);
   // Dopo la chiusura si stampa la copia definitiva appena ricaricata; se il ricaricamento
@@ -163,6 +166,19 @@ export default function Rapportino() {
             },
       );
       if (!resend) setPrintPending(true);
+      revalidator.revalidate();
+    });
+  }
+  // Annullamento di un'uscita del giorno aperto: resta in elenco, fuori dai totali.
+  function cancelExpense(expense: Expense) {
+    return run(async () => {
+      await call("/api/expense-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: expense.id }),
+      });
+      setCancelling(null);
+      setNotice({ tone: "ok", text: `Uscita «${expense.reason}» annullata.` });
       revalidator.revalidate();
     });
   }
@@ -342,6 +358,39 @@ export default function Rapportino() {
         <ReportView
           report={report}
           loading={loading}
+          expenseAction={
+            closed
+              ? undefined
+              : (e) =>
+                  cancelling === e.id ? (
+                    <>
+                      <button
+                        className="btn"
+                        disabled={busy}
+                        onClick={() => cancelExpense(e)}
+                      >
+                        Conferma annullamento
+                      </button>
+                      <button
+                        className="btn"
+                        autoFocus
+                        disabled={busy}
+                        onClick={() => setCancelling(null)}
+                      >
+                        No
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="btn"
+                      disabled={busy || loading}
+                      aria-label={`Annulla l'uscita ${e.reason} di ${euro(e.amountCents)}`}
+                      onClick={() => setCancelling(e.id)}
+                    >
+                      Annulla uscita
+                    </button>
+                  )
+          }
           expenseForm={
             closed ? undefined : (
               <form

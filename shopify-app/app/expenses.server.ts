@@ -64,3 +64,37 @@ export async function addExpense(
     return saved;
   });
 }
+
+// Annullamento prima della chiusura: l'uscita resta registrata con chi l'ha annullata e quando,
+// e non conta più nei totali. Dopo la stampa definitiva non si annulla più nulla.
+export async function cancelExpense(
+  shop: string,
+  operatorId: string,
+  input: unknown,
+) {
+  const parsed = z.object({ id: z.string().min(1).max(64) }).safeParse(input);
+  if (!parsed.success)
+    throw new UserError("Uscita non valida: ricarica la pagina.", 422);
+  const notFound = new UserError(
+    "Uscita non trovata: ricarica la pagina.",
+    404,
+  );
+  // Sempre filtrata per negozio: un id di un altro negozio non esiste.
+  const where = { id: parsed.data.id, shop };
+  const found = await db.cashExpense.findFirst({ where });
+  if (!found) throw notFound;
+  return db.$transaction(async (tx) => {
+    await lockDay(tx, shop, found.reportDate);
+    if (await isClosed(shop, found.reportDate, tx))
+      throw new UserError(
+        `Il rapportino del ${shortDate(found.reportDate)} è definitivo: le uscite non si possono più annullare.`,
+      );
+    const current = await tx.cashExpense.findFirst({ where });
+    if (!current) throw notFound;
+    if (current.cancelledAt) return current;
+    return tx.cashExpense.update({
+      where: { id: current.id },
+      data: { cancelledAt: new Date(), cancelledBy: operatorId },
+    });
+  });
+}

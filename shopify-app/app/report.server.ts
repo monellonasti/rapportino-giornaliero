@@ -191,6 +191,7 @@ async function build(
     expenses: expenses.map((e) => ({
       ...e,
       createdAt: e.createdAt.toISOString(),
+      cancelledAt: e.cancelledAt?.toISOString() ?? null,
     })),
   });
 }

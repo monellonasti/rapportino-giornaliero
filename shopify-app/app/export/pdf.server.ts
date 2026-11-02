@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import PDFDocument from "pdfkit";
 import {
+  dateTimeOf,
   displayMetric,
   euro,
   generatedLabel,
@@ -9,6 +10,7 @@ import {
   shortDate,
   statusLabel,
   timeOf,
+  type Expense,
   type Report,
   type ReportLine,
   type ReportOrder,
@@ -597,19 +599,34 @@ function expenses(pg: Page, report: Report) {
     { label: "Operatore ID", width: 130, align: "left" },
     { label: "Importo", width: 90, align: "right" },
   ]);
+  // Uscite annullate: in grigio, con chi e quando, fuori dal totale.
+  const cancelled = report.expenses.filter((e) => e.cancelledAt).length;
+  const reasonOf = (e: Expense) =>
+    e.cancelledAt ? `${e.reason} (annullata)` : e.reason;
+  const noteOf = (e: Expense) =>
+    e.cancelledAt
+      ? [
+          e.note,
+          `Annullata il ${dateTimeOf(e.cancelledAt, report.timezone)} da operatore ${e.cancelledBy}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : e.note;
   const heights = report.expenses.map((e) =>
     Math.max(
       ROW,
-      pg.measure(e.reason, cols[1].width - 2 * PAD, { size: 9, bold: true }) +
-        8,
-      pg.measure(e.note, cols[2].width - 2 * PAD, { size: 9 }) + 8,
+      pg.measure(reasonOf(e), cols[1].width - 2 * PAD, {
+        size: 9,
+        bold: true,
+      }) + 8,
+      pg.measure(noteOf(e), cols[2].width - 2 * PAD, { size: 9 }) + 8,
     ),
   );
   const block = 19 + heights.reduce((n, h) => n + h, 0) + ROW;
   section(
     pg,
     "Uscite di cassa",
-    `${plural(report.expenses.length, "uscita", "uscite")}  ·  ${euro(report.expensesTotal)}`,
+    `${plural(report.expenses.length - cancelled, "uscita", "uscite")}  ·  ${euro(report.expensesTotal)}${cancelled ? `  ·  ${plural(cancelled, "annullata", "annullate")}` : ""}`,
     block <= KEEP ? block : 19 + heights[0],
   );
   tableHead(pg, cols);
@@ -618,16 +635,19 @@ function expenses(pg: Page, report: Report) {
       tableHead(pg, cols),
     );
     const y = pg.y + 4;
+    const off = e.cancelledAt ? { color: P.muted } : {};
     pg.text(timeOf(e.createdAt, report.timezone), cols[0].x + PAD, y, {
       size: 9,
+      ...off,
     });
-    pg.paragraph(e.reason, cols[1].x + PAD, y, cols[1].width - 2 * PAD, {
+    pg.paragraph(reasonOf(e), cols[1].x + PAD, y, cols[1].width - 2 * PAD, {
       size: 9,
       bold: true,
+      ...off,
     });
-    pg.paragraph(e.note, cols[2].x + PAD, y, cols[2].width - 2 * PAD, {
+    pg.paragraph(noteOf(e), cols[2].x + PAD, y, cols[2].width - 2 * PAD, {
       size: 9,
-      color: P.ink2,
+      color: e.cancelledAt ? P.muted : P.ink2,
     });
     pg.text(e.operatorId, cols[3].x + PAD, y, {
       size: 8.5,
@@ -636,7 +656,8 @@ function expenses(pg: Page, report: Report) {
     });
     pg.text(euro(e.amountCents), cols[4].x + PAD, y, {
       size: 9,
-      bold: true,
+      bold: !e.cancelledAt,
+      ...off,
       width: cols[4].width - 2 * PAD,
       align: "right",
     });
